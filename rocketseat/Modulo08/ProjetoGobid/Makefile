@@ -6,6 +6,9 @@ AWS_ACCOUNT_ID=$(shell aws sts get-caller-identity --query "Account" --output te
 
 ECR_URL=$(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com
 REPO_URL=$(ECR_URL)/$(APP_NAME)
+DB_NAME=$(APP_NAME)-db
+GO=$(shell which go)
+ACCESS_ROLE_ARN=arn:aws:iam::947303613849:role/AppRunnerECRAccessRole
 
 create-sg:
 	@if ! aws ec2 describe-security-groups --filters "Name=group-name,Values=$(SG_NAME)" --region $(REGION) --query "SecurityGroups[*].GroupId" --output text | grep -qE 'sg-'; then \
@@ -45,3 +48,48 @@ push: tag
 	aws ecr get-login-password --region $(REGION) |  \
 	docker login --username AWS --password-stdin $(ECR_URL)
 	docker push $(REPO_URL):latest
+
+create-db:
+	@if ! aws rds describe-db-instances --db-instance-identifier $(DB_NAME) --region $(REGION) >/dev/null 2>&1; then \
+		echo "Creating RDS instance $(DB_NAME)..."; \
+		SG_ID=$$(aws ec2 describe-security-groups \
+			--filters "Name=group-name,Values=$(SG_NAME)" \
+			--region $(REGION) \
+			--query "SecurityGroups[*].GroupId" \
+			--output text); \
+		aws rds create-db-instance \
+			--db-instance-identifier $(DB_NAME) \
+			--db-instance-class db.t3.micro \
+			--engine postgres \
+			--allocated-storage 20 \
+			--master-username postgres \
+			--master-user-password 12345678 \
+			--vpc-security-group-ids $$SG_ID \
+			--publicly-accessible \
+			--backup-retention-period 0 \
+			--no-multi-az \
+			--engine-version 17.5 \
+			--port 5439 \
+			--region $(REGION); \
+	else \
+		echo "RDS instance $(DB_NAME) already exists."; \
+	fi
+
+migrate:
+	go run ./cmd/terndotenv/main.go
+
+deploy:
+	@ if aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='$(APP_NAME)']" --output text | grep -q "$(APP_NAME)"; then \
+		echo "Service '$(APP_NAME)' already exists. Updating..."; \
+		SERVICE_ARN=$$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='$(APP_NAME)'].ServiceArn" --output text); \
+		aws apprunner update-service \
+			--service-arn $$SERVICE_ARN \
+			--source-configuration file://apprunner-config.json \
+			--region $(REGION); \
+	else \
+		echo "Service '$(APP_NAME)' does not exist. Creating..."; \
+		aws apprunner create-service \
+			--service-name $(APP_NAME) \
+			--source-configuration file://apprunner-config.json \
+			--region $(REGION); \
+	fi
