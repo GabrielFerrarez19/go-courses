@@ -83,18 +83,18 @@ func (c *UserController) UpdateUsers(ctx *gin.Context) {
 
 	var user models.User
 
-	if err := ctx.ShouldBind(user); err != nil {
+	if err := ctx.ShouldBind(&user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	row, err := c.userService.UpdateUsers(&user, id)
+	updateUser, err := c.userService.UpdateUsers(&user, id)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, row)
+	ctx.JSON(http.StatusOK, updateUser)
 }
 
 func (c *UserController) DeleteUsers(ctx *gin.Context) {
