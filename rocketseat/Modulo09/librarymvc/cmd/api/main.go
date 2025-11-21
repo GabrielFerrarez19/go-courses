@@ -3,9 +3,17 @@ package main
 import (
 	"log"
 
-	bookscontroller "librarymvc/internal/books/controllers"
-	loanscontroller "librarymvc/internal/loans/controllers"
-	usercontroller "librarymvc/internal/users/controllers"
+	booksController "librarymvc/internal/books/controllers"
+	loansController "librarymvc/internal/loans/controllers"
+	userController "librarymvc/internal/users/controllers"
+
+	bookService "librarymvc/internal/books/services"
+	loanService "librarymvc/internal/loans/services"
+	userService "librarymvc/internal/users/services"
+
+	bookRepository "librarymvc/internal/books/repository"
+	loanRepository "librarymvc/internal/loans/repository"
+	userRepository "librarymvc/internal/users/repository"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,9 +21,20 @@ import (
 func main() {
 	router := gin.Default()
 
-	booksController := bookscontroller.NewBooksController()
-	usersController := usercontroller.NewUserController()
-	loansController := loanscontroller.NewLoansController()
+	// Repositories
+	loanRepo := loanRepository.NewLoansRepository()
+	bookRepo := bookRepository.NewBookRepository()
+	userRepo := userRepository.NewUserRepository()
+
+	// Services
+	bookSvc := bookService.NewBookService(bookRepo)
+	userSvc := userService.NewUserService(userRepo)
+	loanSvc := loanService.NewLoanService(loanRepo, bookSvc, userSvc)
+
+	// Controllers
+	booksController := booksController.NewBooksController(bookSvc)
+	usersController := userController.NewUserController(userSvc)
+	loansController := loansController.NewLoansController(loanSvc)
 
 	booksController.RegisterRoutes(router)
 	usersController.RegisterRoutes(router)

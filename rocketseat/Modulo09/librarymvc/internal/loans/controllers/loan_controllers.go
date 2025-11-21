@@ -84,7 +84,7 @@ func (l *LoansController) ListLoansByUserID(ctx *gin.Context) {
 		return
 	}
 
-	res, err := l.loanService.ListLoanByUserID(userID)
+	res, err := l.loanService.ListActiveLoanByUserID(userID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

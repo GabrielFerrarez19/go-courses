@@ -1,6 +1,6 @@
 package models
 
-type BookService interface {
+type BookRepository interface {
 	CreateBook(book *Book) error
 	GetBookByID(id int64) (*Book, error)
 	ListBook() ([]*Book, error)
